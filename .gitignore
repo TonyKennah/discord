@@ -1,6 +1,9 @@
 # Compiled class file
 *.class
 
+# secret config
+config.properties
+
 # Log file
 *.log
 
