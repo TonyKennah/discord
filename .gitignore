@@ -4,6 +4,8 @@
 # secret config
 config.properties
 
+target/
+
 # Log file
 *.log
 
