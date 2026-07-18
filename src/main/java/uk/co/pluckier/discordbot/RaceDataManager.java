@@ -25,7 +25,7 @@ public class RaceDataManager {
             String formattedDate = today.format(formatter);
 
             // 2. Build the dynamic URL string
-            String urlString = "https://www.pluckier.co.uk/" + formattedDate + "-races.json";
+            String urlString = ConfigLoader.getWebSite() + formattedDate + ConfigLoader.getFileExtension();
             System.out.println("Fetching race data from: " + urlString);
 
             // 3. Create the HTTP client and request

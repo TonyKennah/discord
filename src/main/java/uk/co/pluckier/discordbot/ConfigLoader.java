@@ -21,4 +21,16 @@ public class ConfigLoader {
     public static String getToken() {
         return properties.getProperty("discord.token");
     }
+
+    public static String getChannelId() {
+        return properties.getProperty("discord.channel.id");
+    }
+
+    public static String getWebSite() {
+        return properties.getProperty("website.url");
+    }
+
+    public static String getFileExtension() {
+        return properties.getProperty("file.extension");
+    }
 }

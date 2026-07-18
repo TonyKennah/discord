@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import uk.co.pluckier.discordbot.RaceDataManager;
 
 public class DiscordBot {
-    public static void main(String[] args) {
+    void main() {
         // Initialize the bot here
         System.out.println("Discord Bot is starting...");
     

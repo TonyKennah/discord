@@ -16,7 +16,7 @@ import java.util.Optional;
  */
 public class MessageListener extends ListenerAdapter {
 
-    private static final String TARGET_CHANNEL_ID = "1527431734889807952";
+    //private static final String TARGET_CHANNEL_ID = "1527431734889807952";
 
     private final RaceDataManager data;
     private LocalDate lastFetchedDate;
@@ -32,7 +32,7 @@ public class MessageListener extends ListenerAdapter {
         if (event.getAuthor().isBot()) return;
 
         // Only respond in the target channel
-        if (!event.getChannel().getId().equals(TARGET_CHANNEL_ID)) {
+        if (!event.getChannel().getId().equals(ConfigLoader.getChannelId())) {
             return;
         }
 
