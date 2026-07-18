@@ -85,7 +85,7 @@ public class RaceEmbedBuilder {
         if (bestHistorical != null) {
             embedBuilder.addField(
                 "📊 Best Historical",
-                "**" + bestHistorical.name + "**\nRating: `" + bestHistorical.highestRating + "` | Odds: `" + bestHistorical.currentOdds + "`",
+                "**" + bestHistorical.name + "**\nOdds: `" + bestHistorical.currentOdds + "`",
                 true
             );
         }
@@ -93,7 +93,7 @@ public class RaceEmbedBuilder {
         if (bestFirst3 != null) {
             embedBuilder.addField(
                 "📈 Best Early Form (First 3)",
-                "**" + bestFirst3.name + "**\nAvg Rating: `" + String.format("%.2f", bestFirst3.avgRatingFirst3) + "` | Odds: `" + bestFirst3.currentOdds + "`",
+                "**" + bestFirst3.name + "**\nOdds: `" + bestFirst3.currentOdds + "`",
                 true
             );
         }
