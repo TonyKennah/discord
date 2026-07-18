@@ -11,21 +11,9 @@ import java.util.List;
 public class HorseAnalyzer {
 
     /**
-     * Helper class to store horse prediction data
+     * Immutable record to store horse prediction data
      */
-    public static class HorsePrediction {
-        public String name;
-        public int highestRating;
-        public double avgRatingFirst3;
-        public String currentOdds;
-
-        public HorsePrediction(String name, int highestRating, double avgRatingFirst3, String currentOdds) {
-            this.name = name;
-            this.highestRating = highestRating;
-            this.avgRatingFirst3 = avgRatingFirst3;
-            this.currentOdds = currentOdds;
-        }
-    }
+    public record HorsePrediction(String name, int highestRating, double avgRatingFirst3, String currentOdds) {}
 
     /**
      * Check if a horse is a non-runner based on odds data
