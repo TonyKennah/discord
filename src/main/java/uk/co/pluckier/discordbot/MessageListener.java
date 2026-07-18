@@ -155,6 +155,9 @@ public class MessageListener extends ListenerAdapter {
             return RaceEmbedBuilder.buildNoRacesEmbed();
         }
 
+        // Find the favourite horse (lowest odds)
+        String favouriteHorse = HorseAnalyzer.findFavouriteHorse(horsesNode);
+
         HorseAnalyzer.HorsePrediction bestHistorical = null;
         HorseAnalyzer.HorsePrediction bestFirst3 = null;
 
@@ -175,7 +178,7 @@ public class MessageListener extends ListenerAdapter {
             }
         }
 
-        return RaceEmbedBuilder.buildNextRaceWinnerEmbed(raceTimeStr, racePlaceStr, bestHistorical, bestFirst3);
+        return RaceEmbedBuilder.buildNextRaceWinnerEmbed(raceTimeStr, racePlaceStr, favouriteHorse, bestHistorical, bestFirst3);
     }
 
     /**
