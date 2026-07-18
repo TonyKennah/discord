@@ -92,13 +92,13 @@ public class RaceEmbedBuilder {
 
         if (bestFirst3 != null) {
             embedBuilder.addField(
-                "📈 Best Early Form (First 3)",
+                "📈 Best Recent Form (3)",
                 "**" + bestFirst3.name + "**\nOdds: `" + bestFirst3.currentOdds + "`",
                 true
             );
         }
 
-        embedBuilder.setFooter("Data sourced dynamically from Pluckier Racing")
+        embedBuilder.setFooter("Data sourced dynamically from PluckierAI")
                 .setTimestamp(Instant.now());
 
         return embedBuilder.build();
@@ -112,7 +112,7 @@ public class RaceEmbedBuilder {
                 .setColor(RACING_GREEN)
                 .setTitle("🏁 Upcoming Race Winner Predictions")
                 .setDescription("Analyzing the next " + maxRaces + " cards based on historical performance values.")
-                .setFooter("Data sourced dynamically from Pluckier Racing")
+                .setFooter("Data sourced dynamically from PluckierAI")
                 .setTimestamp(Instant.now());
     }
 
