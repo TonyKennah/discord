@@ -68,6 +68,17 @@ public class HorseAnalyzer {
     }
 
     /**
+     * Parse odds string to double for comparison
+     */
+    public static double parseOdds(String oddsStr) {
+        try {
+            return Double.parseDouble(oddsStr);
+        } catch (NumberFormatException e) {
+            return Double.MAX_VALUE; // Non-runners or invalid odds get highest value
+        }
+    }
+
+    /**
      * Find the highest rating from a horse's past performances
      */
     public static int getHighestRating(JsonNode pastNode) {
@@ -141,5 +152,36 @@ public class HorseAnalyzer {
         }
 
         return new HorsePrediction(horseName, highestRating, avgFirst3, currentOdds);
+    }
+
+    /**
+     * Find the favourite horse (lowest odds) in a race
+     */
+    public static String findFavouriteHorse(JsonNode horsesNode) {
+        if (horsesNode == null || !horsesNode.isArray()) {
+            return "Unknown";
+        }
+
+        String favouriteHorse = "Unknown";
+        double lowestOdds = Double.MAX_VALUE;
+
+        for (JsonNode horse : horsesNode) {
+            JsonNode oddsNode = horse.get("odds");
+            
+            if (isNonRunner(oddsNode)) {
+                continue;
+            }
+
+            List<String> oddsList = extractOddsList(oddsNode);
+            String currentOdds = getCurrentOdds(oddsList);
+            double oddsValue = parseOdds(currentOdds);
+
+            if (oddsValue < lowestOdds) {
+                lowestOdds = oddsValue;
+                favouriteHorse = horse.get("name").asText();
+            }
+        }
+
+        return favouriteHorse;
     }
 }
