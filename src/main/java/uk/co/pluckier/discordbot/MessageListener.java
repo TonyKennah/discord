@@ -267,14 +267,14 @@ public class MessageListener extends ListenerAdapter {
                             // Calculate average rating from last 3 races
                             double avgLast3 = calculateLast3RacesAverage(pastNode);
 
-                            // Update best historical prediction
+                            // Update best historical prediction (based on highest individual rating)
                             if (highestRating > -1) {
                                 if (bestHistorical == null || highestRating > bestHistorical.highestRating) {
                                     bestHistorical = new HorsePrediction(horseName, highestRating, avgLast3, currentOdds);
                                 }
                             }
 
-                            // Update best last 3 races prediction
+                            // Update best last 3 races prediction (based on average of last 3 races)
                             if (avgLast3 > 0) {
                                 if (bestLast3Races == null || avgLast3 > bestLast3Races.avgRatingLast3) {
                                     bestLast3Races = new HorsePrediction(horseName, highestRating, avgLast3, currentOdds);
