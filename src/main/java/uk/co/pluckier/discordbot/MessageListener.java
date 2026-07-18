@@ -175,30 +175,31 @@ public class MessageListener extends ListenerAdapter {
     }
 
     /**
-     * Calculate the average rating from the last 3 races
+     * Calculate the average rating from the first 3 races in the past history
      */
-    private double calculateLast3RacesAverage(JsonNode pastNode) {
+    private double calculateFirst3RacesAverage(JsonNode pastNode) {
         if (pastNode == null || !pastNode.isArray() || pastNode.size() == 0) {
             return 0.0;
         }
 
-        int startIndex = Math.max(0, pastNode.size() - 3);
-        List<Integer> lastThreeRatings = new ArrayList<>();
+        // Get the first 3 races (or fewer if less than 3 exist)
+        int endIndex = Math.min(3, pastNode.size());
+        List<Integer> firstThreeRatings = new ArrayList<>();
 
-        for (int i = startIndex; i < pastNode.size(); i++) {
+        for (int i = 0; i < endIndex; i++) {
             JsonNode pastRace = pastNode.get(i);
             String ratingStr = pastRace.get("name").asText();
             try {
                 int rating = Integer.parseInt(ratingStr);
-                lastThreeRatings.add(rating);
+                firstThreeRatings.add(rating);
             } catch (NumberFormatException ignored) {}
         }
 
-        if (lastThreeRatings.isEmpty()) {
+        if (firstThreeRatings.isEmpty()) {
             return 0.0;
         }
 
-        return lastThreeRatings.stream()
+        return firstThreeRatings.stream()
                 .mapToInt(Integer::intValue)
                 .average()
                 .orElse(0.0);
@@ -219,7 +220,7 @@ public class MessageListener extends ListenerAdapter {
                 if (horsesNode != null && horsesNode.isArray()) {
                     
                     HorsePrediction bestHistorical = null;
-                    HorsePrediction bestLast3Races = null;
+                    HorsePrediction bestFirst3Races = null;
 
                     // 2. Loop through horses in this race
                     for (JsonNode horse : horsesNode) {
@@ -264,27 +265,27 @@ public class MessageListener extends ListenerAdapter {
                                 } catch (NumberFormatException ignored) {}
                             }
 
-                            // Calculate average rating from last 3 races
-                            double avgLast3 = calculateLast3RacesAverage(pastNode);
+                            // Calculate average rating from first 3 races
+                            double avgFirst3 = calculateFirst3RacesAverage(pastNode);
 
                             // Update best historical prediction (based on highest individual rating)
                             if (highestRating > -1) {
                                 if (bestHistorical == null || highestRating > bestHistorical.highestRating) {
-                                    bestHistorical = new HorsePrediction(horseName, highestRating, avgLast3, currentOdds);
+                                    bestHistorical = new HorsePrediction(horseName, highestRating, avgFirst3, currentOdds);
                                 }
                             }
 
-                            // Update best last 3 races prediction (based on average of last 3 races)
-                            if (avgLast3 > 0) {
-                                if (bestLast3Races == null || avgLast3 > bestLast3Races.avgRatingLast3) {
-                                    bestLast3Races = new HorsePrediction(horseName, highestRating, avgLast3, currentOdds);
+                            // Update best first 3 races prediction (based on average of first 3 races)
+                            if (avgFirst3 > 0) {
+                                if (bestFirst3Races == null || avgFirst3 > bestFirst3Races.avgRatingLast3) {
+                                    bestFirst3Races = new HorsePrediction(horseName, highestRating, avgFirst3, currentOdds);
                                 }
                             }
                         }
                     }
 
                     // 4. Build and return the successful prediction Embed card
-                    if (bestHistorical != null || bestLast3Races != null) {
+                    if (bestHistorical != null || bestFirst3Races != null) {
                         EmbedBuilder embedBuilder = new EmbedBuilder()
                                 .setColor(new Color(30, 130, 76)) // Racing Green
                                 .setTitle("🏁 Next Race Winner Prediction")
@@ -300,11 +301,11 @@ public class MessageListener extends ListenerAdapter {
                             );
                         }
 
-                        // Add best last 3 races runner
-                        if (bestLast3Races != null) {
+                        // Add best first 3 races runner
+                        if (bestFirst3Races != null) {
                             embedBuilder.addField(
-                                "📈 Best Recent Form (Last 3)", 
-                                "**" + bestLast3Races.name + "**\nAvg Rating: `" + String.format("%.2f", bestLast3Races.avgRatingLast3) + "` | Odds: `" + bestLast3Races.currentOdds + "`",
+                                "📈 Best Early Form (First 3)", 
+                                "**" + bestFirst3Races.name + "**\nAvg Rating: `" + String.format("%.2f", bestFirst3Races.avgRatingLast3) + "` | Odds: `" + bestFirst3Races.currentOdds + "`",
                                 true
                             );
                         }
