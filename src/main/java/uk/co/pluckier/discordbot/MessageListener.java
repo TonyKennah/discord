@@ -6,6 +6,8 @@ import java.awt.Color;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -32,9 +34,9 @@ public class MessageListener extends ListenerAdapter {
 
         
         String targetChannelId = "1527431734889807952"; 
-    if (!event.getChannel().getId().equals(targetChannelId)) {
-        return; // Ignore the message completely if it's from another channel
-    }
+        if (!event.getChannel().getId().equals(targetChannelId)) {
+            return; // Ignore the message completely if it's from another channel
+        }
 
         String message = event.getMessage().getContentRaw();
 
@@ -126,13 +128,14 @@ public class MessageListener extends ListenerAdapter {
                     .append(raceName)
                     .append(" - ")
                     .append(raceDetails.contains("Handicap")? "Handicap" : "")
+                    .append(raceDetails.contains("Class 1")? " ⭐ Class 1" : "")
                     .append("** (")
                     .append(raceRunners)
                     .append(" runners)\n");
         }
 
         embed.setDescription(listBuilder.toString());
-        embed.setFooter("Use !nextwinner to get the top pick for the upcoming post-time");
+        embed.setFooter("Use !winner to get the top pick for the upcoming post-time");
         embed.setTimestamp(Instant.now());
 
         return embed.build();
@@ -160,6 +163,8 @@ public class MessageListener extends ListenerAdapter {
         JsonNode rootNode = data.getRootNode();
         for (JsonNode raceNode : rootNode) {
             String raceTimeStr = raceNode.get("time").asText();
+            String racePlaceStr = raceNode.get("place").asText();
+            String currentOdds = "";
             LocalTime raceTime = LocalTime.parse(raceTimeStr);
 
             // 1. Find the next race scheduled after current time
@@ -178,7 +183,29 @@ public class MessageListener extends ListenerAdapter {
                             continue; 
                         }
 
+                        if (oddsNode.isArray() && oddsNode.size() > 0) {
+                            JsonNode lastOdds = oddsNode.get(oddsNode.size() - 1);
+                            if (lastOdds == null || lastOdds.isNull() || "null".equalsIgnoreCase(lastOdds.asText())) {
+                                continue;
+                            }
+                        }
+
                         String horseName = horse.get("name").asText();
+
+                        // 1. Get the horse name
+
+                        // 2. Get the odds as a list of strings
+                        List<String> oddsList = new ArrayList<>();
+
+                        if (oddsNode != null && oddsNode.isArray()) {
+                            for (JsonNode odd : oddsNode) {
+                                oddsList.add(odd.asText());
+                            }
+                        }
+
+
+
+
                         JsonNode pastNode = horse.get("past");
 
                         if (pastNode != null && pastNode.isArray()) {
@@ -191,6 +218,9 @@ public class MessageListener extends ListenerAdapter {
                                     if (rating > highestRating) {
                                         highestRating = rating;
                                         topHorseName = horseName;
+                                        if (!oddsList.isEmpty()) {
+                                            currentOdds = oddsList.get(oddsList.size() - 1);
+                                        }
                                     }
                                 } catch (NumberFormatException ignored) {}
                             }
@@ -203,9 +233,9 @@ public class MessageListener extends ListenerAdapter {
                                 .setColor(new Color(30, 130, 76)) // Racing Green [1]
                                 .setTitle("🏁 Next Race Winner Prediction") // [1]
                                 .setDescription("Analyzing the next card based on historical performance values.") // [1]
-                                .addField("⏰ Post Time", "`" + raceTimeStr + "`", true) // [1]
+                                .addField("⏰ ", "`" + raceTimeStr + "` "+racePlaceStr, true) // [1]
                                 .addField("🐎 Top Runner", "**" + topHorseName + "**", true) // [1]
-                                .addField("⭐ Form Rating", "`" + highestRating + " pts`", true) // [1]
+                                .addField("⭐ Odds", "`" + currentOdds + "`", true) // [1]
                                 .setFooter("Data sourced dynamically from Pluckier Racing") // [1]
                                 .setTimestamp(java.time.Instant.now()) // [1]
                                 .build();
@@ -246,6 +276,7 @@ public class MessageListener extends ListenerAdapter {
 
             String raceTimeStr = raceNode.get("time").asText();
             LocalTime raceTime = LocalTime.parse(raceTimeStr);
+            String currentOdds = "";
 
             if (raceTime.isAfter(now)) {
                 JsonNode horsesNode = raceNode.get("horses");
@@ -261,6 +292,21 @@ public class MessageListener extends ListenerAdapter {
                             continue; 
                         }
 
+                        if (oddsNode.isArray() && oddsNode.size() > 0) {
+                            JsonNode lastOdds = oddsNode.get(oddsNode.size() - 1);
+                            if (lastOdds == null || lastOdds.isNull() || "null".equalsIgnoreCase(lastOdds.asText())) {
+                                continue;
+                            }
+                        }
+
+                        List<String> oddsList = new ArrayList<>();
+
+                        if (oddsNode != null && oddsNode.isArray()) {
+                            for (JsonNode odd : oddsNode) {
+                                oddsList.add(odd.asText());
+                            }
+                        }
+
                         String horseName = horse.get("name").asText();
                         JsonNode pastNode = horse.get("past");
 
@@ -273,6 +319,9 @@ public class MessageListener extends ListenerAdapter {
                                     if (rating > highestRating) {
                                         highestRating = rating;
                                         topHorseName = horseName;
+                                        if (!oddsList.isEmpty()) {
+                                            currentOdds = oddsList.get(oddsList.size() - 1);
+                                        }
                                     }
                                 } catch (NumberFormatException ignored) {}
                             }
@@ -286,7 +335,7 @@ public class MessageListener extends ListenerAdapter {
                         // False means stacked vertically (cleaner layout for lists)
                         embed.addField(
                             "⏰ " + raceTimeStr + " - " + racePlace, 
-                            "🐎 **" + topHorseName + "** — Form Rating: `" + highestRating + " pts`", 
+                            "🐎 **" + topHorseName + "** — Current Odds: `" + currentOdds + "`", 
                             false
                         );
                         
