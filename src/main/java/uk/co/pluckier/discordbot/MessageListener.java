@@ -157,6 +157,53 @@ public class MessageListener extends ListenerAdapter {
         return "No upcoming races found.";
     }
 
+    /**
+     * Helper class to store horse prediction data
+     */
+    private static class HorsePrediction {
+        String name;
+        int highestRating;
+        double avgRatingLast3;
+        String currentOdds;
+
+        HorsePrediction(String name, int highestRating, double avgRatingLast3, String currentOdds) {
+            this.name = name;
+            this.highestRating = highestRating;
+            this.avgRatingLast3 = avgRatingLast3;
+            this.currentOdds = currentOdds;
+        }
+    }
+
+    /**
+     * Calculate the average rating from the last 3 races
+     */
+    private double calculateLast3RacesAverage(JsonNode pastNode) {
+        if (pastNode == null || !pastNode.isArray() || pastNode.size() == 0) {
+            return 0.0;
+        }
+
+        int startIndex = Math.max(0, pastNode.size() - 3);
+        List<Integer> lastThreeRatings = new ArrayList<>();
+
+        for (int i = startIndex; i < pastNode.size(); i++) {
+            JsonNode pastRace = pastNode.get(i);
+            String ratingStr = pastRace.get("name").asText();
+            try {
+                int rating = Integer.parseInt(ratingStr);
+                lastThreeRatings.add(rating);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        if (lastThreeRatings.isEmpty()) {
+            return 0.0;
+        }
+
+        return lastThreeRatings.stream()
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(0.0);
+    }
+
     public MessageEmbed getNextRaceWinnerEmbed() {
         LocalTime now = LocalTime.now();
 
@@ -164,7 +211,6 @@ public class MessageListener extends ListenerAdapter {
         for (JsonNode raceNode : rootNode) {
             String raceTimeStr = raceNode.get("time").asText();
             String racePlaceStr = raceNode.get("place").asText();
-            String currentOdds = "";
             LocalTime raceTime = LocalTime.parse(raceTimeStr);
 
             // 1. Find the next race scheduled after current time
@@ -172,8 +218,8 @@ public class MessageListener extends ListenerAdapter {
                 JsonNode horsesNode = raceNode.get("horses");
                 if (horsesNode != null && horsesNode.isArray()) {
                     
-                    String topHorseName = "Unknown";
-                    int highestRating = -1;
+                    HorsePrediction bestHistorical = null;
+                    HorsePrediction bestLast3Races = null;
 
                     // 2. Loop through horses in this race
                     for (JsonNode horse : horsesNode) {
@@ -192,9 +238,7 @@ public class MessageListener extends ListenerAdapter {
 
                         String horseName = horse.get("name").asText();
 
-                        // 1. Get the horse name
-
-                        // 2. Get the odds as a list of strings
+                        // Get the odds as a list of strings
                         List<String> oddsList = new ArrayList<>();
 
                         if (oddsNode != null && oddsNode.isArray()) {
@@ -203,52 +247,82 @@ public class MessageListener extends ListenerAdapter {
                             }
                         }
 
-
-
+                        String currentOdds = oddsList.isEmpty() ? "N/A" : oddsList.get(oddsList.size() - 1);
 
                         JsonNode pastNode = horse.get("past");
 
                         if (pastNode != null && pastNode.isArray()) {
-                            // 3. Loop through past performances
+                            // Find highest historical rating
+                            int highestRating = -1;
                             for (JsonNode pastRace : pastNode) {
                                 String ratingStr = pastRace.get("name").asText();
                                 try {
                                     int rating = Integer.parseInt(ratingStr);
-
                                     if (rating > highestRating) {
                                         highestRating = rating;
-                                        topHorseName = horseName;
-                                        if (!oddsList.isEmpty()) {
-                                            currentOdds = oddsList.get(oddsList.size() - 1);
-                                        }
                                     }
                                 } catch (NumberFormatException ignored) {}
+                            }
+
+                            // Calculate average rating from last 3 races
+                            double avgLast3 = calculateLast3RacesAverage(pastNode);
+
+                            // Update best historical prediction
+                            if (highestRating > -1) {
+                                if (bestHistorical == null || highestRating > bestHistorical.highestRating) {
+                                    bestHistorical = new HorsePrediction(horseName, highestRating, avgLast3, currentOdds);
+                                }
+                            }
+
+                            // Update best last 3 races prediction
+                            if (avgLast3 > 0) {
+                                if (bestLast3Races == null || avgLast3 > bestLast3Races.avgRatingLast3) {
+                                    bestLast3Races = new HorsePrediction(horseName, highestRating, avgLast3, currentOdds);
+                                }
                             }
                         }
                     }
 
-                    // 4. Build and return the successful prediction Embed card [1]
-                    if (highestRating != -1) {
-                        return new EmbedBuilder()
-                                .setColor(new Color(30, 130, 76)) // Racing Green [1]
-                                .setTitle("🏁 Next Race Winner Prediction") // [1]
-                                .setDescription("Analyzing the next card based on historical performance values.") // [1]
-                                .addField("⏰ ", "`" + raceTimeStr + "` "+racePlaceStr, true) // [1]
-                                .addField("🐎 Top Runner", "**" + topHorseName + "**", true) // [1]
-                                .addField("⭐ Odds", "`" + currentOdds + "`", true) // [1]
-                                .setFooter("Data sourced dynamically from Pluckier Racing") // [1]
-                                .setTimestamp(java.time.Instant.now()) // [1]
-                                .build();
+                    // 4. Build and return the successful prediction Embed card
+                    if (bestHistorical != null || bestLast3Races != null) {
+                        EmbedBuilder embedBuilder = new EmbedBuilder()
+                                .setColor(new Color(30, 130, 76)) // Racing Green
+                                .setTitle("🏁 Next Race Winner Prediction")
+                                .setDescription("Analyzing the next card based on performance metrics.")
+                                .addField("⏰ ", "`" + raceTimeStr + "` " + racePlaceStr, true);
+
+                        // Add historical best runner
+                        if (bestHistorical != null) {
+                            embedBuilder.addField(
+                                "📊 Best Historical", 
+                                "**" + bestHistorical.name + "**\nRating: `" + bestHistorical.highestRating + "` | Odds: `" + bestHistorical.currentOdds + "`",
+                                true
+                            );
+                        }
+
+                        // Add best last 3 races runner
+                        if (bestLast3Races != null) {
+                            embedBuilder.addField(
+                                "📈 Best Recent Form (Last 3)", 
+                                "**" + bestLast3Races.name + "**\nAvg Rating: `" + String.format("%.2f", bestLast3Races.avgRatingLast3) + "` | Odds: `" + bestLast3Races.currentOdds + "`",
+                                true
+                            );
+                        }
+
+                        embedBuilder.setFooter("Data sourced dynamically from Pluckier Racing")
+                                .setTimestamp(java.time.Instant.now());
+
+                        return embedBuilder.build();
                     }
                 }
             }
         }
 
-        // 5. Fallback Embed card if no upcoming races are scheduled [1]
+        // 5. Fallback Embed card if no upcoming races are scheduled
         return new EmbedBuilder()
-                .setColor(new Color(217, 30, 30)) // Warning Red [1]
-                .setTitle("🚫 No Races Remaining") // [1]
-                .setDescription("There are no further races scheduled after your local system time for today.") // [1]
+                .setColor(new Color(217, 30, 30)) // Warning Red
+                .setTitle("🚫 No Races Remaining")
+                .setDescription("There are no further races scheduled after your local system time for today.")
                 .build();
     }
 
