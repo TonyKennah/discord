@@ -166,13 +166,13 @@ public class MessageListener extends ListenerAdapter {
             if (prediction == null) continue;
 
             // Track best historical rating
-            if (bestHistorical == null || prediction.highestRating > bestHistorical.highestRating) {
+            if (bestHistorical == null || prediction.highestRating() > bestHistorical.highestRating()) {
                 bestHistorical = prediction;
             }
 
             // Track best first 3 races average
-            if (prediction.avgRatingFirst3 > 0) {
-                if (bestFirst3 == null || prediction.avgRatingFirst3 > bestFirst3.avgRatingFirst3) {
+            if (prediction.avgRatingFirst3() > 0) {
+                if (bestFirst3 == null || prediction.avgRatingFirst3() > bestFirst3.avgRatingFirst3()) {
                     bestFirst3 = prediction;
                 }
             }
@@ -209,7 +209,7 @@ public class MessageListener extends ListenerAdapter {
                 HorseAnalyzer.HorsePrediction prediction = HorseAnalyzer.analyzeHorse(horse);
                 if (prediction == null) continue;
 
-                if (bestHorse == null || prediction.highestRating > bestHorse.highestRating) {
+                if (bestHorse == null || prediction.highestRating() > bestHorse.highestRating()) {
                     bestHorse = prediction;
                 }
             }
@@ -217,7 +217,7 @@ public class MessageListener extends ListenerAdapter {
             if (bestHorse != null) {
                 embed.addField(
                     "⏰ " + raceTimeStr + " - " + racePlace,
-                    "🐎 **" + bestHorse.name + "** — Current Odds: `" + bestHorse.currentOdds + "`",
+                    "🐎 **" + bestHorse.name() + "** — Current Odds: `" + bestHorse.currentOdds() + "`",
                     false
                 );
             }
