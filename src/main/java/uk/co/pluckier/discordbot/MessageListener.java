@@ -1,12 +1,14 @@
 package uk.co.pluckier.discordbot;
 
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import com.fasterxml.jackson.databind.JsonNode;
-
+import java.awt.Color;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -72,7 +74,7 @@ public class MessageListener extends ListenerAdapter {
             int numRaces = Integer.parseInt(message.substring(2));
             event.getChannel().sendMessageEmbeds(getNextRacesWinnerEmbed(numRaces)).queue();
         } else if (message.equalsIgnoreCase("!next")) {
-            event.getChannel().sendMessage(getNextRaceInfo()).queue();
+            event.getChannel().sendMessageEmbeds(getNextRaceEmbeds(LocalTime.now())).queue();
         } else if (message.equalsIgnoreCase("!help")) {
             event.getChannel().sendMessageEmbeds(RaceEmbedBuilder.buildHelpEmbed()).queue();
         }
@@ -81,18 +83,63 @@ public class MessageListener extends ListenerAdapter {
     /**
      * Get the next race information as a simple string
      */
-    private String getNextRaceInfo() {
+    private List<MessageEmbed> getNextRaceEmbeds(LocalTime now) {
+        List<MessageEmbed> embeds = new ArrayList<>();
         JsonNode rootNode = data.getRootNode();
-        Optional<JsonNode> nextRace = RaceFilter.findNextRace(rootNode, LocalTime.now());
-
-        if (nextRace.isPresent()) {
-            JsonNode raceNode = nextRace.get();
-            String raceTime = raceNode.get("time").asText();
-            String raceName = raceNode.get("place").asText();
-            return "Next Race: " + raceTime + " " + raceName;
+        Optional<JsonNode> nextRace = RaceFilter.findNextRace(rootNode, now);
+        
+        if (nextRace.isEmpty()) {
+            EmbedBuilder errorEmbed = new EmbedBuilder()
+                .setTitle("❌ No Races Found")
+                .setDescription("There are no upcoming races scheduled for today.")
+                .setColor(0xE74C3C);
+            embeds.add(errorEmbed.build());
+            return embeds;
         }
 
-        return "No upcoming races found.";
+        JsonNode raceNode = nextRace.get();
+        String raceTime = raceNode.path("time").asText("Unknown Time");
+        String raceName = raceNode.path("place").asText("Unknown Location");
+        String going = raceNode.path("going").asText("Not Specified");
+        
+        // 1. Primary Overview Card
+        EmbedBuilder mainEmbed = new EmbedBuilder()
+            .setTitle("🏇 Upcoming Race: " + raceName)
+            .setColor(0x2ECC71)
+            .addField("🕒 Post Time", raceTime, true)
+            .addField("🌱 Going", going, true);
+        embeds.add(mainEmbed.build());
+
+        // 2. Horse Silk Cards List
+        JsonNode runnersNode = raceNode.path("horses");
+        if (runnersNode.isArray() && !runnersNode.isEmpty()) {
+            for (JsonNode runner : runnersNode) {
+                String horseNumber = runner.path("number").asText("?");
+                String horseName = runner.path("name").asText("Unknown Horse");
+                String silkUrl = runner.path("silks").asText(null);
+                String trainer = runner.path("trainer").asText(null);
+                String jockey = runner.path("jockey").asText(null);
+                String odds = HorseAnalyzer.getCurrentOdds(HorseAnalyzer.extractOddsList(runner.path("odds")));
+
+                
+                EmbedBuilder horseEmbed = new EmbedBuilder()
+                    .setColor(0x3498DB); // Light blue accent for the runner list cards
+                    
+
+                //horseEmbed.setTitle(horseNumber + ". " + horseName);
+                //horseEmbed.setDescription(horseNumber + ". d " + horseName);
+                if (silkUrl != null && !silkUrl.isEmpty()) {
+                // Arguments: setAuthor(textLabel, clickableLinkUrl, iconImageUrl)
+                    horseEmbed.setAuthor(horseNumber + ". " + horseName + " -- " + odds + " -- " + trainer + "/" + jockey, null, silkUrl);
+                } else {
+                    // Fallback text if the horse has no silk image data available
+                    horseEmbed.setTitle(horseNumber + ". " + horseName);
+                }
+                embeds.add(horseEmbed.build());
+            }
+        }
+        
+        return embeds;
     }
 
     /**

@@ -8,10 +8,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
+
+import uk.co.pluckier.discordbot.BotMessageEvent;
 import uk.co.pluckier.discordbot.RaceDataManager;
 
+
 public class DiscordBot {
-    void main() {
+
+    //String message = "Hello";
+    public static void main(String[] args) {
+        var event = new BotMessageEvent();
+        event.begin();
+        event.message = "Hello event from Discord Bot";
+
         // Initialize the bot here
         System.out.println("Discord Bot is starting...");
     
@@ -28,6 +37,7 @@ public class DiscordBot {
             jda.awaitReady(); 
             System.out.println("Bot is successfully connected and online!");
 
+            event.commit();
         } catch (InterruptedException e) {
             System.err.println("Bot startup was interrupted.");
             Thread.currentThread().interrupt();
