@@ -10,7 +10,7 @@ public class ConfigLoader {
 
     static {
         // Loads the file from the root directory of your project
-        try (InputStream input = new FileInputStream("config.properties")) {
+        try (InputStream input = ConfigLoader.class.getClassLoader().getResourceAsStream("config.properties")) {
             properties.load(input);
         } catch (IOException ex) {
             System.err.println("CRITICAL: Could not find config.properties file!");

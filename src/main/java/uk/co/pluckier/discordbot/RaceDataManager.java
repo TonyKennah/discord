@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 public class RaceDataManager {
@@ -20,7 +21,7 @@ public class RaceDataManager {
     public void fetchTodaysRaces() {
         try {
             // 1. Get today's system date and format it to "dd-MM-yyyy"
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
             String formattedDate = today.format(formatter);
 

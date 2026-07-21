@@ -9,6 +9,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import uk.co.pluckier.discordbot.RacingButtonListener;
 import uk.co.pluckier.discordbot.BotMessageEvent;
 import uk.co.pluckier.discordbot.RaceDataManager;
 
@@ -23,14 +24,18 @@ public class DiscordBot {
 
         // Initialize the bot here
         System.out.println("Discord Bot is starting...");
+        DiscordWebhookSender webhookSender = new DiscordWebhookSender();
+        webhookSender.startScheduler(); 
     
         RaceDataManager data = new RaceDataManager();
         data.fetchTodaysRaces(); // Fetch and load today's races
 
         try {
+            MessageListener messageListener = new MessageListener(data);
             JDA jda = JDABuilder.createDefault(ConfigLoader.getToken()) // Use the token from config.properties
-                    .enableIntents(GatewayIntent.MESSAGE_CONTENT) 
-                    .addEventListeners(new MessageListener(data))    
+                    .enableIntents(GatewayIntent.MESSAGE_CONTENT)
+                    .addEventListeners(messageListener)
+                    .addEventListeners(new RacingButtonListener(messageListener)) 
                     .build();
 
             // CRUCIAL: This blocks the main thread so the program doesn't exit

@@ -1,13 +1,21 @@
 package uk.co.pluckier.discordbot;
 
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.utils.messages.MessageCreateData;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.awt.Color;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +33,7 @@ public class MessageListener extends ListenerAdapter {
 
     public MessageListener(RaceDataManager data) {
         this.data = data;
-        this.lastFetchedDate = LocalDate.now();
+        this.lastFetchedDate = LocalDate.now(ZoneId.of("Europe/London"));
     }
 
     @Override
@@ -51,10 +59,10 @@ public class MessageListener extends ListenerAdapter {
      * Reload race data if it's a new day
      */
     private void reloadRaceDataIfNewDay() {
-        if (!LocalDate.now().equals(lastFetchedDate)) {
+        if (!LocalDate.now(ZoneId.of("Europe/London")).equals(lastFetchedDate)) {
             System.out.println("New day detected! Reloading race data...");
             data.fetchTodaysRaces();
-            this.lastFetchedDate = LocalDate.now();
+            this.lastFetchedDate = LocalDate.now(ZoneId.of("Europe/London"));
         }
     }
 
@@ -74,16 +82,61 @@ public class MessageListener extends ListenerAdapter {
             int numRaces = Integer.parseInt(message.substring(2));
             event.getChannel().sendMessageEmbeds(getNextRacesWinnerEmbed(numRaces)).queue();
         } else if (message.equalsIgnoreCase("!next")) {
-            event.getChannel().sendMessageEmbeds(getNextRaceEmbeds(LocalTime.now())).queue();
+            event.getChannel().sendMessage(getNextRaceEmbeds(LocalTime.now(ZoneId.of("Europe/London")))).queue();
         } else if (message.equalsIgnoreCase("!help")) {
             event.getChannel().sendMessageEmbeds(RaceEmbedBuilder.buildHelpEmbed()).queue();
+        } else if (message.equalsIgnoreCase("!test1")) {
+            event.getChannel().sendMessageEmbeds(getSpecial()).queue();
+        } else if (message.equalsIgnoreCase("!test2")) {
+            event.getChannel().sendMessage(getButtonsOn().build()).queue();
+        }
+    }
+
+
+    private MessageCreateBuilder getButtonsOn(){
+        // 1. Create the visual layout
+        EmbedBuilder embed = new EmbedBuilder()
+            .setTitle("🏁 RACECARD: Leopardstown - 15:30")
+            .setDescription("Select a runner below to view deep form analysis.")
+            .setColor(0x24FEDB); // Dark green
+
+        // 2. Attach interactive buttons underneath the card
+        MessageCreateBuilder message = new MessageCreateBuilder()
+            .setEmbeds(embed.build())
+            .addActionRow(
+                Button.primary("btn_horse_1", "1. Galopin Des Champs"),
+                Button.primary("btn_horse_2", "2. Fastorslow"),
+                Button.secondary("btn_refresh", "🔄 Refresh Odds")
+            );
+
+        return message;
+    }
+
+    public MessageCreateData getNextRaceEmbedsFromTime(String raceTimeStr) {
+        try {
+            // Parse the "14:45" string into a LocalTime object
+            LocalTime parsedTime = LocalTime.parse(raceTimeStr);
+            
+            // Pass the parsed time into your existing logic
+            return getNextRaceEmbeds(parsedTime);
+            
+        } catch (DateTimeParseException e) {
+            // Fallback embed if the string format is invalid or corrupted
+            List<MessageEmbed> errorEmbeds = new ArrayList<>();
+            EmbedBuilder errorEmbed = new EmbedBuilder()
+                .setTitle("❌ Invalid Time Format")
+                .setDescription("Could not parse the provided race time: " + raceTimeStr)
+                .setColor(0xE74C3C);
+            errorEmbeds.add(errorEmbed.build());
+            
+            return new MessageCreateBuilder().setEmbeds(errorEmbeds).build();
         }
     }
 
     /**
      * Get the next race information as a simple string
      */
-    private List<MessageEmbed> getNextRaceEmbeds(LocalTime now) {
+    public MessageCreateData getNextRaceEmbeds(LocalTime now) {
         List<MessageEmbed> embeds = new ArrayList<>();
         JsonNode rootNode = data.getRootNode();
         Optional<JsonNode> nextRace = RaceFilter.findNextRace(rootNode, now);
@@ -94,7 +147,7 @@ public class MessageListener extends ListenerAdapter {
                 .setDescription("There are no upcoming races scheduled for today.")
                 .setColor(0xE74C3C);
             embeds.add(errorEmbed.build());
-            return embeds;
+            return new MessageCreateBuilder().setEmbeds(embeds).build();
         }
 
         JsonNode raceNode = nextRace.get();
@@ -130,16 +183,46 @@ public class MessageListener extends ListenerAdapter {
                 //horseEmbed.setDescription(horseNumber + ". d " + horseName);
                 if (silkUrl != null && !silkUrl.isEmpty()) {
                 // Arguments: setAuthor(textLabel, clickableLinkUrl, iconImageUrl)
-                    horseEmbed.setAuthor(horseNumber + ". " + horseName + " -- " + odds + " -- " + trainer + "/" + jockey, null, silkUrl);
+                    horseEmbed.setFooter(horseNumber + ". " + horseName + " -- " + odds + " -- " + trainer + "/" + jockey, silkUrl);
                 } else {
                     // Fallback text if the horse has no silk image data available
                     horseEmbed.setTitle(horseNumber + ". " + horseName);
                 }
-                embeds.add(horseEmbed.build());
+                if(embeds.size() < 10){
+                    embeds.add(horseEmbed.build());
+                }
             }
         }
+
+        // 3. Create Navigation Buttons
+        // We pass the current race's time string in the ID so our button listener knows where we are
+        Button prevButton = Button.primary("prev:" + raceTime, "⏮️ Previous Race");
+        Button nextButton = Button.primary("next:" + raceTime, "Next Race ⏭️");
+
+        // Assemble everything into a final Message Data structure
+        return new MessageCreateBuilder()
+                .setEmbeds(embeds)
+                .setComponents(ActionRow.of(prevButton, nextButton))
+                .build();
         
-        return embeds;
+    }
+
+
+    private MessageEmbed getSpecial(){
+
+        EmbedBuilder mainEmbed = new EmbedBuilder()
+        .setColor(0x0099ff)
+	    .setTitle("Some title")
+	    //.setURL("https://discord.js.org/")
+	    .setAuthor("Some name", "https://i.imgur.com/AfFp7pu.png", "https://discord.js.org")
+	    .setDescription("Some description here")
+	    .setThumbnail("https://i.imgur.com/AfFp7pu.png")
+        .addField("Fa","Fb", true)
+	    .setImage("https://i.imgur.com/AfFp7pu.png")
+        .setTimestamp(Instant.now())
+	    .setFooter("Some footer text here", "https://i.imgur.com/AfFp7pu.png" );
+
+        return mainEmbed.build();
     }
 
     /**
@@ -187,7 +270,7 @@ public class MessageListener extends ListenerAdapter {
      */
     private MessageEmbed getNextRaceWinnerEmbed() {
         JsonNode rootNode = data.getRootNode();
-        Optional<JsonNode> nextRace = RaceFilter.findNextRace(rootNode, LocalTime.now());
+        Optional<JsonNode> nextRace = RaceFilter.findNextRace(rootNode, LocalTime.now(ZoneId.of("Europe/London")));
 
         if (!nextRace.isPresent()) {
             return RaceEmbedBuilder.buildNoRacesEmbed();
@@ -233,7 +316,7 @@ public class MessageListener extends ListenerAdapter {
      */
     private MessageEmbed getNextRacesWinnerEmbed(int maxRaces) {
         JsonNode rootNode = data.getRootNode();
-        List<JsonNode> races = RaceFilter.getNextNRaces(rootNode, LocalTime.now(), maxRaces);
+        List<JsonNode> races = RaceFilter.getNextNRaces(rootNode, LocalTime.now(ZoneId.of("Europe/London")), maxRaces);
 
         if (races.isEmpty()) {
             return RaceEmbedBuilder.buildNoRacesEmbed();
