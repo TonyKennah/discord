@@ -3,6 +3,7 @@
 
 # secret config
 config.properties
+last_results.txt
 
 *.jfr
 

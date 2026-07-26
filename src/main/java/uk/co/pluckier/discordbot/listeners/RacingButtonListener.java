@@ -1,11 +1,10 @@
-package uk.co.pluckier.discordbot;
+package uk.co.pluckier.discordbot.listeners;
 
 import java.time.LocalTime;
 import java.time.ZoneId;
 
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import uk.co.pluckier.discordbot.MessageListener;
 
 public class RacingButtonListener extends ListenerAdapter {
 

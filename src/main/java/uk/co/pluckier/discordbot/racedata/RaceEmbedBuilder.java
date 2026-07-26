@@ -1,7 +1,9 @@
-package uk.co.pluckier.discordbot;
+package uk.co.pluckier.discordbot.racedata;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import uk.co.pluckier.discordbot.filters.HorseAnalyzer;
+
 import java.awt.Color;
 import java.time.Instant;
 

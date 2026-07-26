@@ -1,4 +1,4 @@
-package uk.co.pluckier.discordbot;
+package uk.co.pluckier.discordbot.filters;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;

@@ -1,8 +1,14 @@
-package uk.co.pluckier.discordbot;
+package uk.co.pluckier.discordbot.listeners;
 
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.utils.messages.MessageCreateData;
+import uk.co.pluckier.discordbot.config.ConfigLoader;
+import uk.co.pluckier.discordbot.filters.HorseAnalyzer;
+import uk.co.pluckier.discordbot.filters.RaceFilter;
+import uk.co.pluckier.discordbot.filters.HorseAnalyzer.HorsePrediction;
+import uk.co.pluckier.discordbot.racedata.RaceDataManager;
+import uk.co.pluckier.discordbot.racedata.RaceEmbedBuilder;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -10,6 +16,9 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+
 import java.awt.Color;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -59,10 +68,15 @@ public class MessageListener extends ListenerAdapter {
      * Reload race data if it's a new day
      */
     private void reloadRaceDataIfNewDay() {
-        if (!LocalDate.now(ZoneId.of("Europe/London")).equals(lastFetchedDate)) {
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
+        if (!today.equals(lastFetchedDate)) {
             System.out.println("New day detected! Reloading race data...");
             data.fetchTodaysRaces();
-            this.lastFetchedDate = LocalDate.now(ZoneId.of("Europe/London"));
+            
+            // Guard: Only advance tracking date if data was successfully fetched
+            if (data.getRootNode() != null) {
+                this.lastFetchedDate = today;
+            }
         }
     }
 
@@ -77,7 +91,7 @@ public class MessageListener extends ListenerAdapter {
         } else if (message.equalsIgnoreCase("!tips")) {
             event.getChannel().sendMessage("https://pluckier.github.io/tips 📝").queue();
         } else if (message.equalsIgnoreCase("!races")) {
-            event.getChannel().sendMessageEmbeds(getTodaysRacesEmbed()).queue();
+            event.getChannel().sendMessageEmbeds(getTodaysRacesEmbed(data.getRootNode())).queue();
         } else if (message.matches("^!w\\d+$")) {
             int numRaces = Integer.parseInt(message.substring(2));
             event.getChannel().sendMessageEmbeds(getNextRacesWinnerEmbed(numRaces)).queue();
@@ -85,11 +99,55 @@ public class MessageListener extends ListenerAdapter {
             event.getChannel().sendMessage(getNextRaceEmbeds(LocalTime.now(ZoneId.of("Europe/London")))).queue();
         } else if (message.equalsIgnoreCase("!help")) {
             event.getChannel().sendMessageEmbeds(RaceEmbedBuilder.buildHelpEmbed()).queue();
+        } else if (message.equalsIgnoreCase("!nice")) {
+            event.getChannel().sendMessageEmbeds(findRacesWithExperiencedFields()).queue();
         } else if (message.equalsIgnoreCase("!test1")) {
             event.getChannel().sendMessageEmbeds(getSpecial()).queue();
         } else if (message.equalsIgnoreCase("!test2")) {
             event.getChannel().sendMessage(getButtonsOn().build()).queue();
         }
+    }
+
+    public MessageEmbed findRacesWithExperiencedFields() {
+        List<JsonNode> qualifyingRaces = new ArrayList<>();
+
+        JsonNode races = data.getRootNode();
+        List<JsonNode> racesNode = RaceFilter.findAllRacesAfter(races, LocalTime.now(ZoneId.of("Europe/London")));
+
+        // Loop through every race in the dataset
+        for (JsonNode raceNode : racesNode) {
+            JsonNode horsesNode = raceNode.path("horses");
+            
+            // Skip races that have no horses listed yet
+            if (!horsesNode.isArray() || horsesNode.isEmpty()) {
+                continue;
+            }
+
+            boolean allHorsesQualify = true;
+
+            // Check every single runner inside this race
+            for (JsonNode horseNode : horsesNode) {
+                JsonNode pastRacesNode = horseNode.path("past");
+                
+                // Get the count of past runs (array size). Treats missing/non-arrays as 0.
+                int pastRunCount = pastRacesNode.isArray() ? pastRacesNode.size() : 0;
+
+                // If even ONE horse has fewer than 6 runs, the whole race fails the condition
+                if (pastRunCount < 6) {
+                    allHorsesQualify = false;
+                    break; // Stop checking this race immediately, move to next
+                }
+            }
+
+            // If the loop finished without tripping the flag, this race meets your criteria
+            if (allHorsesQualify) {
+                qualifyingRaces.add(raceNode);
+            }
+        }
+
+        JsonNode qualifyingRacesNode = convertListToJsonNode(qualifyingRaces);
+
+        return getTodaysRacesEmbed(qualifyingRacesNode);
     }
 
 
@@ -225,11 +283,22 @@ public class MessageListener extends ListenerAdapter {
         return mainEmbed.build();
     }
 
+    public static JsonNode convertListToJsonNode(List<JsonNode> list) {
+        // Directly pull the global node factory without creating an ObjectMapper
+        ArrayNode arrayNode = JsonNodeFactory.instance.arrayNode();
+        
+        // Add items
+        for (JsonNode node : list) {
+            arrayNode.add(node);
+        }
+        
+        return arrayNode; 
+    }
+
     /**
      * Get today's races as an embed
      */
-    private MessageEmbed getTodaysRacesEmbed() {
-        JsonNode rootNode = data.getRootNode();
+    private MessageEmbed getTodaysRacesEmbed(JsonNode rootNode) {
 
         if (rootNode == null || !rootNode.isArray() || rootNode.size() == 0) {
             return RaceEmbedBuilder.buildNoDataEmbed();
@@ -238,7 +307,7 @@ public class MessageListener extends ListenerAdapter {
         var embed = RaceEmbedBuilder.buildTodaysRacesEmbed();
 
         StringBuilder listBuilder = new StringBuilder();
-        listBuilder.append("Here is the complete schedule of races available today:\n\n");
+        listBuilder.append("Here is the selected schedule of races available today:\n\n");
 
         for (JsonNode raceNode : rootNode) {
             String raceName = raceNode.path("place").asText("Unknown Location");

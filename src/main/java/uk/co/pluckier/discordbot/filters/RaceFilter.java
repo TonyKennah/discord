@@ -1,7 +1,9 @@
-package uk.co.pluckier.discordbot;
+package uk.co.pluckier.discordbot.filters;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -28,6 +30,34 @@ public class RaceFilter {
         }
 
         return Optional.empty();
+    }
+
+
+    public static List<JsonNode> findAllRacesAfter(JsonNode rootNode, LocalTime now) {
+        List<JsonNode> upcomingRaces = new ArrayList<>();
+        
+        // Null and structural sanity check
+        if (rootNode == null || !rootNode.isArray()) {
+            return upcomingRaces;
+        }
+
+        // Iterate through all races in the array
+        for (JsonNode raceNode : rootNode) {
+            // Using path().asText() prevents NullPointerExceptions if the time key is missing
+            String raceTimeStr = raceNode.path("time").asText();
+            
+            try {
+                LocalTime raceTime = LocalTime.parse(raceTimeStr);
+                // Collect every race that satisfies the condition
+                if (raceTime.isAfter(now)) {
+                    upcomingRaces.add(raceNode);
+                }
+            } catch (Exception ignored) {
+                // Quietly skip any entry with a corrupted or invalid time format
+            }
+        }
+
+        return upcomingRaces;
     }
 
     /**

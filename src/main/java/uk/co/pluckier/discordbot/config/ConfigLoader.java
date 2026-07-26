@@ -1,6 +1,5 @@
-package uk.co.pluckier.discordbot;
+package uk.co.pluckier.discordbot.config;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -9,11 +8,14 @@ public class ConfigLoader {
     private static final Properties properties = new Properties();
 
     static {
-        // Loads the file from the root directory of your project
         try (InputStream input = ConfigLoader.class.getClassLoader().getResourceAsStream("config.properties")) {
-            properties.load(input);
+            if (input == null) {
+                System.err.println("CRITICAL: config.properties not found in resources folder!");
+            } else {
+                properties.load(input);
+            }
         } catch (IOException ex) {
-            System.err.println("CRITICAL: Could not find config.properties file!");
+            System.err.println("CRITICAL: Failed to read config.properties file!");
             ex.printStackTrace();
         }
     }
@@ -32,5 +34,17 @@ public class ConfigLoader {
 
     public static String getFileExtension() {
         return properties.getProperty("file.extension");
+    }
+
+    public static String getResultsURL() {
+        return properties.getProperty("results.url");
+    }
+
+    public static String getWebhookURL() {
+        return properties.getProperty("webhook.url");
+    }
+
+    public static String getStorageFile() {
+        return properties.getProperty("storage.file");
     }
 }
