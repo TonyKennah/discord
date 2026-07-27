@@ -28,17 +28,18 @@ public class RaceEmbedBuilder {
         helpEmbed.setDescription("Here is a list of all available commands you can use with this bot:");
 
         helpEmbed.addField("🔧 Utility Commands",
-            "`!help` - Display this help menu.\n" +
-            "`!site` - Get the link to the racing site.\n" +
-            "`!tips` - Get the link to the tips site.",
-            false);
+                "`!help` - Display this help menu.\n" +
+                        "`!site` - Get the link to the racing site.\n" +
+                        "`!tips` - Get the link to the tips site.",
+                false);
 
         helpEmbed.addField("🏇 Racing Commands",
-            "`!winner` - Get the predicted winner for the next race.\n" +
-            "`!wX` - Get the predicted winners for the next X races.\n" +
-            "`!next` - Get info on the next upcoming race.\n" +
-            "`!races` - Get the complete list of today's races.",
-            false);
+                "`!winner` - Get the predicted winner for the next race.\n" +
+                        "`!wX` - Get the predicted winners for the next X races.\n" +
+                        "`!next` - Get info on the next upcoming race.\n" +
+                        "`!nice` - List races with experienced fields.\n" +
+                        "`!races` - Get the complete list of today's races.",
+                false);
 
         helpEmbed.setFooter("Tip: Type commands exactly as shown above.");
         helpEmbed.setTimestamp(Instant.now());
@@ -72,9 +73,9 @@ public class RaceEmbedBuilder {
      * Build the next race winner prediction embed with dual metrics
      */
     public static MessageEmbed buildNextRaceWinnerEmbed(String raceTime, String racePlace,
-                                                         String favouriteHorse,
-                                                         HorseAnalyzer.HorsePrediction bestHistorical,
-                                                         HorseAnalyzer.HorsePrediction bestFirst3) {
+            String favouriteHorse,
+            HorseAnalyzer.HorsePrediction bestHistorical,
+            HorseAnalyzer.HorsePrediction bestFirst3) {
         if (bestHistorical == null && bestFirst3 == null) {
             return buildNoRacesEmbed();
         }
@@ -87,18 +88,16 @@ public class RaceEmbedBuilder {
 
         if (bestHistorical != null) {
             embedBuilder.addField(
-                "📊 Best Historical",
-                "**" + bestHistorical.name() + "**\nOdds: `" + bestHistorical.currentOdds() + "`",
-                true
-            );
+                    "📊 Best Historical",
+                    "**" + bestHistorical.name() + "**\nOdds: `" + bestHistorical.currentOdds() + "`",
+                    true);
         }
 
         if (bestFirst3 != null) {
             embedBuilder.addField(
-                "📈 Best Recent Form (3)",
-                "**" + bestFirst3.name() + "**\nOdds: `" + bestFirst3.currentOdds() + "`",
-                true
-            );
+                    "📈 Best Recent Form (3)",
+                    "**" + bestFirst3.name() + "**\nOdds: `" + bestFirst3.currentOdds() + "`",
+                    true);
         }
 
         embedBuilder.setFooter("Data sourced dynamically from PluckierAI")
