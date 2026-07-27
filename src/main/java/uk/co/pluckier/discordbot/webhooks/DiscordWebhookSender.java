@@ -17,19 +17,19 @@ import uk.co.pluckier.discordbot.filters.HorseAnalyzer;
 import uk.co.pluckier.discordbot.filters.RaceFilter;
 import uk.co.pluckier.discordbot.racedata.RaceDataManager;
 import uk.co.pluckier.discordbot.utils.SharedHttpClient;
+import uk.co.pluckier.discordbot.config.ConfigLoader;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 public class DiscordWebhookSender {
 
-    private static final String WEBHOOK_URL = "https://discordapp.com/api/webhooks/1528892051146670160/jmNLWC4iVWXZIf5CQz5XIE7ghuppaVcS6Sag6Cp9jDuYm3TXnSvREIF8vaS6dRKIh7yH";
-
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private static String lastAlertedRaceTime = "";
 
     private static LocalDate lastTrackingDate = LocalDate.MIN;
-    
-    // Memory fix: Use a primitive timestamp to calculate when it's safe to poll the API again
+
+    // Memory fix: Use a primitive timestamp to calculate when it's safe to poll the
+    // API again
     private static long nextAllowedCheckTimeMillis = 0;
 
     public static void main(String[] args) {
@@ -39,16 +39,22 @@ public class DiscordWebhookSender {
 
     public void startScheduler() {
         System.out.println("🏁 Automated Racing Engine Started with State-Driven Fixed Rate Loop!");
-        
-        // FIX: Schedule exactly ONE recurring task. It never adds new tasks to the queue.
+
+        // FIX: Schedule exactly ONE recurring task. It never adds new tasks to the
+        // queue.
         scheduler.scheduleAtFixedRate(DiscordWebhookSender::executeEngineCycle, 0, 1, TimeUnit.MINUTES);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("🛑 Shutting down Automated Racing Engine scheduler pool cleanly...");
+            scheduler.shutdown();
+        }));
     }
 
     private static void executeEngineCycle() {
-        // Safe check: If we are in "smart sleep" mode, instantly exit. 
+        // Safe check: If we are in "smart sleep" mode, instantly exit.
         // No network calls made, no objects allocated, completely free.
         if (System.currentTimeMillis() < nextAllowedCheckTimeMillis) {
-            return; 
+            return;
         }
 
         try {
@@ -60,12 +66,12 @@ public class DiscordWebhookSender {
                 lastAlertedRaceTime = "";
                 lastTrackingDate = today;
             }
-            
-            System.out.println("🔄 Fetching fresh schedule data...");
+
+            System.out.println(now + " 🔄 Fetching fresh schedule data...");
             RaceDataManager data = new RaceDataManager();
             data.fetchTodaysRaces();
             JsonNode rootNode = data.getRootNode();
-            
+
             Optional<JsonNode> nextRace = RaceFilter.findNextRace(rootNode, now);
 
             if (nextRace.isEmpty()) {
@@ -79,7 +85,7 @@ public class DiscordWebhookSender {
 
             LocalTime raceTime = LocalTime.parse(raceTimeStr);
             long minutesUntilRace = now.until(raceTime, ChronoUnit.MINUTES);
-            
+
             long minutesToSleep = minutesUntilRace - 4;
 
             if (minutesToSleep <= 0) {
@@ -89,9 +95,9 @@ public class DiscordWebhookSender {
                     sendRaceAlertPayload(raceNode, raceTimeStr, now);
                 }
                 // Allow checking again next minute to clear the race window safely
-                setSmartSleepMinutes(0); 
+                setSmartSleepMinutes(0);
             } else {
-                System.out.printf("💤 Next race at %s (%d mins away). Smart sleeping for %d minutes...\n", 
+                System.out.printf("💤 Next race at %s (%d mins away). Smart sleeping for %d minutes...\n",
                         raceTimeStr, minutesUntilRace, minutesToSleep);
                 setSmartSleepMinutes(minutesToSleep);
             }
@@ -130,14 +136,14 @@ public class DiscordWebhookSender {
                 String trainer = runner.path("trainer").asText("Unknown");
                 String jockey = runner.path("jockey").asText("Unknown");
                 String odds = HorseAnalyzer.getCurrentOdds(HorseAnalyzer.extractOddsList(runner.path("odds")));
-                
+
                 String fieldSnippet = """
-                    {
-                    "name": "%s. %s (%s)",
-                    "value": "👟 *J/T:* %s / %s",
-                    "inline": true
-                    }
-                    """.formatted(horseNumber, horseName, odds, jockey, trainer);
+                        {
+                        "name": "%s. %s (%s)",
+                        "value": "👟 *J/T:* %s / %s",
+                        "inline": true
+                        }
+                        """.formatted(horseNumber, horseName, odds, jockey, trainer);
 
                 fieldsJsonBuilder.append(fieldSnippet);
                 if (i < runnersNode.size() - 1) {
@@ -149,23 +155,23 @@ public class DiscordWebhookSender {
         String timeNowStr = now.toString().substring(0, 5);
 
         String jsonPayload = """
-            {
-            "content": "🚨 **Upcoming Race Alert! Starts in 4 minutes!**",
-            "embeds": [
                 {
-                "title": "🏁 RACECARD: %s %s %s",
-                "description": "💰 ** %s ** \\nTotal Runners: %s",
-                "color": 2424619,
-                "fields": [
-                    %s
-                ],
-                "footer": { 
-                    "text": "Data refreshed: %s | Automated Racing Engine" 
+                "content": "🚨 **Upcoming Race Alert! Starts in 4 minutes!**",
+                "embeds": [
+                    {
+                    "title": "🏁 RACECARD: %s %s %s",
+                    "description": "💰 ** %s ** \\nTotal Runners: %s",
+                    "color": 2424619,
+                    "fields": [
+                        %s
+                    ],
+                    "footer": {
+                        "text": "Data refreshed: %s | PluckierAI Racing Engine"
+                    }
+                    }
+                ]
                 }
-                }
-            ]
-            }
-            """.formatted(raceTimeStr, raceName, going, detail, runners, fieldsJsonBuilder.toString(), timeNowStr);
+                """.formatted(raceTimeStr, raceName, going, detail, runners, fieldsJsonBuilder.toString(), timeNowStr);
 
         sendRaceTip(jsonPayload);
     }
@@ -173,7 +179,7 @@ public class DiscordWebhookSender {
     public static void sendRaceTip(String jsonPayload) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(WEBHOOK_URL))
+                    .uri(URI.create(ConfigLoader.getWebhookURL()))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
