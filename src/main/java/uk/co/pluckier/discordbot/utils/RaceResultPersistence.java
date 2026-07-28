@@ -8,11 +8,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import uk.co.pluckier.discordbot.config.ConfigLoader;
 import uk.co.pluckier.discordbot.model.RaceResult;
-import uk.co.pluckier.discordbot.model.Position;
 
 public class RaceResultPersistence {
+
+    private static final Logger log = LoggerFactory.getLogger(RaceResultPersistence.class);
 
     public static void storeSingleResult(RaceResult result) {
         // 1. Flatten your structured positions list into a simple readable text segment
@@ -30,7 +34,7 @@ public class RaceResultPersistence {
         try (java.io.FileWriter writer = new java.io.FileWriter(ConfigLoader.getStorageFile(), true)) {
             writer.write(newLine + "\n");
         } catch (IOException e) {
-            System.err.println("Local file persistence failed for " + result.time() + ": " + e.getMessage());
+            log.error("Local file persistence failed for " + result.time() + ": " + e.getMessage());
         }
     }
 
@@ -53,11 +57,11 @@ public class RaceResultPersistence {
                         updatedCacheKeys.add(parts[0].trim() + "|" + parts[1].trim());
                     }
                 }
-                System.out.println("Housekeeping complete: Cleaned file and RAM cache bounds safely.");
+                log.info("Housekeeping complete: Cleaned file and RAM cache bounds safely.");
                 return updatedCacheKeys;
             }
         } catch (IOException e) {
-            System.err.println("Failed to prune historical storage file: " + e.getMessage());
+            log.error("Failed to prune historical storage file: " + e.getMessage());
         }
         return null;
     }

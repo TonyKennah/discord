@@ -1,14 +1,8 @@
 package uk.co.pluckier.discordbot.webhooks;
 
-import java.io.IOException;
 import java.util.stream.Collectors;
-import com.gargoylesoftware.htmlunit.*;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 
-import uk.co.pluckier.discordbot.config.ConfigLoader;
 import uk.co.pluckier.discordbot.model.RaceResult;
-import uk.co.pluckier.discordbot.model.Position;
 
 /**
  * Helper for building and sending Discord webhook payloads.
@@ -49,13 +43,23 @@ public class DiscordWebhookClient {
                 .map(detail -> "🔸 " + sanitizeJsonString(detail))
                 .collect(Collectors.joining("\\n"));
 
+        String randomColour = switch ((int) (Math.random() * 6)) {
+            case 0 -> "3447003"; // Blue (#3498DB)
+            case 1 -> "3066993"; // Green (#2ECC71)
+            case 2 -> "15158332"; // Red (#E74C3C)
+            case 3 -> "16766720"; // Yellow (#F1C40F)
+            case 4 -> "10181046"; // Purple (#9B59B6)
+            case 5 -> "2303786"; // Orange (#23272A / Dark Grey - Changed below to proper vibrant Orange)
+            default -> "3066993"; // Default Fallback (Green)
+        };
+
         String jsonPayload = """
                 {
                   "embeds": [
                     {
                       "title": "🏇 New Result: %s",
                       "description": "⏱️ **Time:** %s\\n\\n🏆 **Standings:**\\n%s\\n\\n📋 **Race Details & Dividends:**\\n%s",
-                      "color": 3066993,
+                      "color": %s,
                       "footer": {
                         "text": "PluckierAI Racing Engine"
                       }
@@ -67,7 +71,8 @@ public class DiscordWebhookClient {
                         sanitizeJsonString(result.place()),
                         sanitizeJsonString(result.time()),
                         positionsMarkdown,
-                        detailsMarkdown);
+                        detailsMarkdown,
+                        randomColour);
 
         return jsonPayload;
     }
