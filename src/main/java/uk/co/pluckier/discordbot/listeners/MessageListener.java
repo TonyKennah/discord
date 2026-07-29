@@ -3,6 +3,7 @@ package uk.co.pluckier.discordbot.listeners;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.utils.messages.MessageCreateData;
+import uk.co.pluckier.discordbot.RaceAnalysisFilter;
 import uk.co.pluckier.discordbot.config.ConfigLoader;
 import uk.co.pluckier.discordbot.filters.HorseAnalyzer;
 import uk.co.pluckier.discordbot.filters.RaceFilter;
@@ -88,8 +89,14 @@ public class MessageListener extends ListenerAdapter {
      * Route message to appropriate command handler
      */
     private void routeCommand(String message, MessageReceivedEvent event) {
+        data.fetchTodaysRaces();
         if (message.equalsIgnoreCase("!winner")) {
             event.getChannel().sendMessageEmbeds(getNextRaceWinnerEmbed()).queue();
+        } else if (message.equalsIgnoreCase("!value")) {
+            event.getChannel().sendMessageEmbeds(processTipsters()).queue();
+        } else if (message.matches("^!value\\d+$")) {
+            int odds = Integer.parseInt(message.substring(6));
+            event.getChannel().sendMessageEmbeds(processTipsters(odds)).queue();
         } else if (message.equalsIgnoreCase("!site")) {
             event.getChannel().sendMessage("https://pluckier.github.io/racing 🏇").queue();
         } else if (message.equalsIgnoreCase("!tips")) {
@@ -110,6 +117,19 @@ public class MessageListener extends ListenerAdapter {
         } else if (message.equalsIgnoreCase("!test2")) {
             event.getChannel().sendMessage(getButtonsOn().build()).queue();
         }
+    }
+
+    public MessageEmbed processTipsters(int odds) {
+        RaceAnalysisFilter analysisFilter = new RaceAnalysisFilter(data);
+        MessageEmbed filteredResults = analysisFilter.analyzeRaces(odds);
+
+        return filteredResults;
+    }
+
+    public MessageEmbed processTipsters() {
+        RaceAnalysisFilter analysisFilter = new RaceAnalysisFilter(data);
+        MessageEmbed filteredResults = analysisFilter.analyzeRaces(10);
+        return filteredResults;
     }
 
     public MessageEmbed findRacesWithExperiencedFields() {

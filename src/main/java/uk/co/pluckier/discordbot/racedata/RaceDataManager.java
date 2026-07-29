@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -101,7 +102,7 @@ public class RaceDataManager {
         if (nextRace.isPresent()) {
             this.nextRaceTime = LocalTime.parse(nextRace.get().path("time").asText(), TIME_FORMATTER);
         } else {
-            this.nextRaceTime = currentTime;
+            this.nextRaceTime = lastRaceTime;
         }
 
     }
@@ -146,5 +147,9 @@ public class RaceDataManager {
 
     public LocalTime getNextRaceTime() {
         return this.nextRaceTime;
+    }
+
+    public LocalTime getLastRefreshTime() {
+        return LocalTime.ofInstant(Instant.ofEpochMilli(this.lastFetchTimeMillis), ZoneId.of("Europe/London"));
     }
 }

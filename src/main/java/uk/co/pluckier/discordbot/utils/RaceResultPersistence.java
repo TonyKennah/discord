@@ -39,30 +39,36 @@ public class RaceResultPersistence {
     }
 
     public static Set<String> pruneStorageFile() {
+        Set<String> updatedCacheKeys = new HashSet<>();
         try {
             File file = new File(ConfigLoader.getStorageFile());
-            if (!file.exists())
-                return null;
+            if (!file.exists()) {
+                return updatedCacheKeys; // Return empty set instead of null
+            }
 
             List<String> allLines = Files.readAllLines(file.toPath());
 
-            if (allLines.size() > 150) {
-                List<String> trimmedLines = allLines.subList(allLines.size() - 100, allLines.size());
-                Files.write(file.toPath(), trimmedLines);
-
-                Set<String> updatedCacheKeys = new HashSet<>();
-                for (String line : trimmedLines) {
-                    String[] parts = line.split("\\|", 3);
-                    if (parts.length >= 2) {
-                        updatedCacheKeys.add(parts[0].trim() + "|" + parts[1].trim());
-                    }
-                }
-                log.info("Housekeeping complete: Cleaned file and RAM cache bounds safely.");
-                return updatedCacheKeys;
+            // Housekeeping: Trim the file only if it exceeds our threshold
+            if (allLines.size() > 100) {
+                allLines = allLines.subList(allLines.size() - 50, allLines.size());
+                Files.write(file.toPath(), allLines);
+                log.info("Housekeeping complete: Trimmed historical storage file down to 50 entries.");
             }
+
+            // ALWAYS map the active lines to keys, whether we trimmed the file or not!
+            for (String line : allLines) {
+                String[] parts = line.split("\\|", 3);
+                if (parts.length >= 2) {
+                    updatedCacheKeys.add(parts[0].trim() + "|" + parts[1].trim());
+                }
+            }
+
         } catch (IOException e) {
             log.error("Failed to prune historical storage file: " + e.getMessage());
         }
-        return null;
+
+        // Always returns the true state of the file, never null!
+        return updatedCacheKeys;
     }
+
 }
