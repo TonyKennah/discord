@@ -36,8 +36,12 @@ public class RaceEmbedBuilder {
                 helpEmbed.addField("🏇 Racing Commands",
                                 "`!winner` - Get the predicted winner for the next race.\n" +
                                                 "`!wX` - Get the predicted winners for the next X races.\n" +
-                                                "`!value` - Get analysed horses for value betting (over 10/1).\n" +
-                                                "`!valueX` - Get analysed horses for value betting (over X/1).\n" +
+                                                "`!value` - Get next race analysed horses for value betting (over 10/1).\n"
+                                                +
+                                                "`!valueX` - Get next race analysed horses for value betting (over X/1).\n"
+                                                +
+                                                "`!values` - Get analysed horses for value betting (over 10/1).\n" +
+                                                "`!valuesX` - Get analysed horses for value betting (over X/1).\n" +
                                                 "`!next` - Get info on the next upcoming race.\n" +
                                                 "`!nice` - List races with experienced fields.\n" +
                                                 "`!races` - Get the complete list of today's races.",

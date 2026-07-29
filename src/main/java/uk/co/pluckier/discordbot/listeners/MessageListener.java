@@ -92,11 +92,16 @@ public class MessageListener extends ListenerAdapter {
         data.fetchTodaysRaces();
         if (message.equalsIgnoreCase("!winner")) {
             event.getChannel().sendMessageEmbeds(getNextRaceWinnerEmbed()).queue();
-        } else if (message.equalsIgnoreCase("!value")) {
+        } else if (message.equalsIgnoreCase("!values")) {
             event.getChannel().sendMessageEmbeds(processTipsters()).queue();
+        } else if (message.matches("^!values\\d+$")) {
+            int odds = Integer.parseInt(message.substring(7));
+            event.getChannel().sendMessageEmbeds(processTipsters(odds)).queue();
+        } else if (message.equalsIgnoreCase("!value")) {
+            event.getChannel().sendMessageEmbeds(processTipster()).queue();
         } else if (message.matches("^!value\\d+$")) {
             int odds = Integer.parseInt(message.substring(6));
-            event.getChannel().sendMessageEmbeds(processTipsters(odds)).queue();
+            event.getChannel().sendMessageEmbeds(processTipster(odds)).queue();
         } else if (message.equalsIgnoreCase("!site")) {
             event.getChannel().sendMessage("https://pluckier.github.io/racing 🏇").queue();
         } else if (message.equalsIgnoreCase("!tips")) {
@@ -117,6 +122,18 @@ public class MessageListener extends ListenerAdapter {
         } else if (message.equalsIgnoreCase("!test2")) {
             event.getChannel().sendMessage(getButtonsOn().build()).queue();
         }
+    }
+
+    public MessageEmbed processTipster(int odds) {
+        RaceAnalysisFilter analysisFilter = new RaceAnalysisFilter(data);
+        MessageEmbed filteredResults = analysisFilter.analyzeSingleRace(odds);
+        return filteredResults;
+    }
+
+    public MessageEmbed processTipster() {
+        RaceAnalysisFilter analysisFilter = new RaceAnalysisFilter(data);
+        MessageEmbed filteredResults = analysisFilter.analyzeSingleRace(10);
+        return filteredResults;
     }
 
     public MessageEmbed processTipsters(int odds) {

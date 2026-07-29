@@ -31,6 +31,7 @@ public class ResultBotSender {
 
     private static final Logger log = LoggerFactory.getLogger(ResultBotSender.class);
     private RaceDataManager data;
+    private ScheduledFuture<?> future;
 
     public static void main(String[] args) {
         log.info("--- Starting Single Test Run ---");
@@ -41,14 +42,11 @@ public class ResultBotSender {
         log.info("--- Single Test Run Finished ---");
     }
 
-    // Use a daemon thread factory for the scheduler
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(r, "result-bot-scheduler");
-            t.setDaemon(true);
-            return t;
-        }
+    private final ScheduledThreadPoolExecutor scheduler = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(1, r -> {
+        // 2. Sleek Java 25 Lambda syntax replaces the anonymous inner class block
+        Thread t = new Thread(r, "result-bot-scheduler");
+        t.setDaemon(true);
+        return t;
     });
 
     // Bounded, concurrent set for known results
@@ -73,6 +71,7 @@ public class ResultBotSender {
 
     public ResultBotSender(RaceDataManager data) {
         this.data = data;
+        this.scheduler.setRemoveOnCancelPolicy(true);
         Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
 
@@ -101,7 +100,7 @@ public class ResultBotSender {
         }
     }
 
-    public void startScheduler() {
+        public void startScheduler() {
         long initialDelay = 0;
         LocalTime now = LocalTime.now(ZoneId.of("Europe/London"));
 
@@ -120,7 +119,7 @@ public class ResultBotSender {
                 log.info("Racing finished for today. Sleeping for " + initialDelay
                         + " minutes until 11:00 AM tomorrow.");
             } else {
-                // Racing hasn't started yet today. Wait until 4 minutes after the first race.
+                // Racing hasn't started yet today. Wait until 1 minute after the first race expected time.
                 LocalTime expectedResultTime = nextRace.plusMinutes(1);
                 long minutesToWait = Duration.between(now, expectedResultTime).toMinutes();
                 initialDelay = Math.max(0, minutesToWait);
@@ -130,12 +129,33 @@ public class ResultBotSender {
             }
         }
 
-        scheduler.scheduleAtFixedRate(this::checkForNewResults, initialDelay, 5, TimeUnit.MINUTES);
-        log.info("ResultBotSender started. Active check interval is set to 5 minutes.");
+        // Cancel any lingering task execution references safely before spinning up a new one
+        if (this.future != null && !this.future.isDone()) {
+            this.future.cancel(false);
+        }
+        this.scheduler.purge(); // Instantly wipe references to help Generational ZGC
+
+        future = scheduler.scheduleAtFixedRate(this::checkForNewResults, initialDelay, 5, TimeUnit.MINUTES);
+        log.info("ResultBotSender started. Active check interval is set to 5 minutes after initial delay of " + initialDelay + " minutes.");
     }
 
     private void checkForNewResults() {
+        LocalTime now = LocalTime.now(ZoneId.of("Europe/London"));
+
         if (!Utils.isWithinRacingHours(data)) {
+            LocalTime nextRace = data.getNextRaceTime();
+            LocalTime lastRace = data.getLastRaceTime();
+
+            // 🔥 TARGETED RESET TRIGGER: Detect if racing is completed for the day
+            if (nextRace.equals(lastRace) && now.isAfter(lastRace.plusMinutes(30))) {
+                log.info("🏁 Racing has concluded for the day. Initiating scheduler reset routine...");
+                
+                // 🔥 THE LIVE DEADBOCK FIREWALL: Use an independent worker task thread 
+                // to kill and reschedule this execution loop from the outside.
+                scheduler.execute(this::startScheduler);
+                return; 
+            }
+
             log.info("Skipping check. Current UK time is outside active racing hours." +
                     " First race at " + data.getFirstRaceTime().toString() + " " +
                     " Last race at " + data.getLastRaceTime().toString());
@@ -146,17 +166,13 @@ public class ResultBotSender {
         try {
             String url = ConfigLoader.getResultsURL();
 
-            // MEMORY FIX: Connect directly using JSoup to download the raw HTML text
-            // string.
-            // This drops the virtual Chrome rendering engine completely to save RAM.
             doc = org.jsoup.Jsoup.connect(url)
                     .userAgent(
                             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
                     .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9")
-                    .timeout(15000) // 15-second safety limit so your background thread never hangs
+                    .timeout(15000) 
                     .get();
 
-            // Refactored to use dedicated Parser Class
             List<RaceResult> results = SportingLifeParser.parseRaceResults(doc);
             log.info("Found " + results.size() + " total results on page.");
 
@@ -173,15 +189,13 @@ public class ResultBotSender {
             log.error("Error tracking results: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            // CRITICAL PROTECTION: This code runs NO MATTER WHAT.
-            // Even if an unexpected error breaks the try loop above, the DOM tree is
-            // cleared.
             if (doc != null) {
                 doc.empty();
-                doc = null; // Sever the reference so GC reclaims it instantly
+                doc = null; 
             }
         }
     }
+
 
     private void processResults(List<RaceResult> newResults) {
         log.info("Processing " + newResults.size() + " new results individually...");

@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -26,7 +25,6 @@ public class RaceDataManager {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("H:mm");
 
-    // Cooldown duration boundary (10 minutes in milliseconds)
     private static final long FETCH_COOLDOWN_MS = 10 * 60 * 1000;
 
     private JsonNode rootNode;
@@ -34,21 +32,17 @@ public class RaceDataManager {
     private LocalTime lastRaceTime;
     private LocalTime nextRaceTime;
 
-    // Track when the last network call successfully finished
     private long lastFetchTimeMillis = 0;
 
     public void forceFetchTodaysRaces() {
         log.info("🧹 Forcing immediate data fetch (Resetting cooldown)...");
-        this.lastFetchTimeMillis = 0; // Force the next call to NOT skip
+        this.lastFetchTimeMillis = 0;
         fetchTodaysRaces();
     }
 
     public void fetchTodaysRaces() {
         long currentTime = System.currentTimeMillis();
 
-        // 1. COOLDOWN CHECK: Skip if a fresh call was executed less than 10 minutes ago
-        // We ensure rootNode isn't null just in case the first boot needs an emergency
-        // download
         if (this.rootNode != null && (currentTime - lastFetchTimeMillis < FETCH_COOLDOWN_MS)) {
             long secondsRemaining = (FETCH_COOLDOWN_MS - (currentTime - lastFetchTimeMillis)) / 1000;
             log.info("Skipping fresh network fetch. Data is cached. Cooldown remaining: {}s", secondsRemaining);
@@ -66,28 +60,41 @@ public class RaceDataManager {
                     .GET()
                     .build();
 
+            // Fetch the response normally (no try-with-resources on the response itself)
             HttpResponse<InputStream> response = SharedHttpClient.getClient()
                     .send(request, HttpResponse.BodyHandlers.ofInputStream());
 
-            if (response.statusCode() == 200) {
-                // 2. SAFE PLACEMENT: Only clear old data now that we have a valid 200 OK stream
-                // ready
-                this.rootNode = null;
-                this.firstRaceTime = null;
-                this.lastRaceTime = null;
+            // 🔥 CORRECT MEMORY FIX: Always wrap the raw response body stream inside
+            // try-with-resources.
+            // This guarantees the underlying network channel socket is forced closed,
+            // even if the server replies with a non-200 error code.
+            try (InputStream responseStream = response.body()) {
 
-                try (InputStream responseStream = response.body()) {
+                if (response.statusCode() == 200) {
+                    // Clear references to let the Garbage Collector recycle old Jackson structures
+                    this.rootNode = null;
+                    this.firstRaceTime = null;
+                    this.lastRaceTime = null;
+
                     this.rootNode = SharedHttpClient.getMapper().readTree(responseStream);
+
                     extractFirstAndLastRaceTimes();
                     extractNextRaceTime();
 
-                    // Update timestamp upon a successful download process completion
                     this.lastFetchTimeMillis = System.currentTimeMillis();
                     log.info("Successfully fetched fresh race schedule data from server.");
+                } else {
+                    log.error("Failed to fetch data! Code: {}", response.statusCode());
+
+                    // Consume any leftover bytes from the error payload to flush the TCP pipeline
+                    // clean
+                    if (responseStream != null) {
+                        responseStream.transferTo(java.io.OutputStream.nullOutputStream());
+                    }
                 }
-            } else {
-                log.error("Failed to fetch data! Code: {}", response.statusCode());
-            }
+            } // The InputStream block safely shuts down and terminates the network connection
+              // here
+
         } catch (Exception e) {
             log.error("An error occurred while fetching or parsing race data.", e);
         }
@@ -104,7 +111,6 @@ public class RaceDataManager {
         } else {
             this.nextRaceTime = lastRaceTime;
         }
-
     }
 
     private void extractFirstAndLastRaceTimes() {

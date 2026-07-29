@@ -8,10 +8,12 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.StreamSupport;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import uk.co.pluckier.discordbot.filters.RaceFilter;
 import uk.co.pluckier.discordbot.racedata.RaceDataManager;
 
 import java.awt.Color;
@@ -71,6 +73,43 @@ public class RaceAnalysisFilter {
         }
 
         // 4. Append clean live system refresh clock tracking string to footer
+        LocalTime timestamp = data.getLastRefreshTime();
+        embedBuilder.setFooter("Last refreshed: " + timestamp, null);
+
+        return embedBuilder.build();
+    }
+
+    public MessageEmbed analyzeSingleRace(double minOdds) {
+        Optional<JsonNode> raceNodeOptional = RaceFilter.findNextRace(data.getRootNode(),
+                LocalTime.now(ZoneId.of("Europe/London")));
+        JsonNode raceNode = null;
+        if (raceNodeOptional.isPresent()) {
+            raceNode = raceNodeOptional.get();
+        }
+        EmbedBuilder embedBuilder = new EmbedBuilder();
+
+        if (raceNode == null) {
+            embedBuilder.setTitle("🏁 Single Race Analysis")
+                    .setColor(new Color(231, 76, 60)) // Crimson Red for error states
+                    .setDescription("❌ No valid race node data was supplied for analysis.");
+            return embedBuilder.build();
+        }
+
+        String time = raceNode.path("time").asText();
+        String place = raceNode.path("place").asText();
+
+        embedBuilder.setTitle("🏁 Race Analysis: " + time + " " + place)
+                .setColor(new Color(46, 204, 113))
+                .setDescription("High-utility selections filtered by your background metrics criteria.");
+
+        // Process the individual race nodes into the builder state
+        boolean hasQualifiedRunners = processSingleRace(raceNode, minOdds, embedBuilder);
+
+        if (!hasQualifiedRunners) {
+            embedBuilder.setDescription(
+                    "⚠️ No horses from our analysis qualified at the current **" + minOdds + "** odds limit.");
+        }
+
         LocalTime timestamp = data.getLastRefreshTime();
         embedBuilder.setFooter("Last refreshed: " + timestamp, null);
 

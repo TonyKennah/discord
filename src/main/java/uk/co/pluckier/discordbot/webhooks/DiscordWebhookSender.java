@@ -100,6 +100,7 @@ public class DiscordWebhookSender {
             if (nextRace.isEmpty()) {
                 log.info("📭 No more races found for today. Smart sleep for 1 hour...");
                 setSmartSleepMinutes(60);
+                data.fetchTodaysRaces();
                 return;
             }
 
